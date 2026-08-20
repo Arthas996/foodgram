@@ -122,6 +122,21 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd ~/foodgram
+
+            if [ ! -f .env ]; then
+              echo "Creating .env file from secrets..."
+              cat > .env << EOF
+            SECRET_KEY=${{ secrets.SECRET_KEY }}
+            DEBUG=False
+            ALLOWED_HOSTS=localhost,158.160.232.154,FOODGRAM96.WORK.GD
+            POSTGRES_DB=foodgram
+            POSTGRES_USER=foodgram_user
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DB_HOST=db
+            DB_PORT=5432
+            EOF
+            fi
+
             sudo docker compose -f docker-compose.production.yml pull
             sudo docker compose -f docker-compose.production.yml down
             sudo docker compose -f docker-compose.production.yml up -d
