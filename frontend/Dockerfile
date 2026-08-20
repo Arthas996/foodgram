@@ -7,8 +7,7 @@ COPY . ./
 ENV CI=false
 RUN npm run build
 
-
 FROM alpine:latest
 WORKDIR /static
 COPY --from=build /app/build/. /static/
-RUN mv /static/static/* /static/ && rm -rf /static/static
+RUN if [ -d /static/static ]; then mv /static/static/* /static/ && rm -rf /static/static; fi
