@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from backend.constants import (
+from constants import (
     MAX_LENGTH_INGREDIENT_NAME, MAX_LENGTH_INGREDIENT_UNIT,
     MAX_LENGTH_RECIPE_NAME, MAX_LENGTH_TAG_NAME, MAX_LENGTH_TAG_SLUG,
     MIN_COOKING_TIME, MIN_INGREDIENT_AMOUNT,

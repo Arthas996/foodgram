@@ -2,7 +2,7 @@
 from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 
-from backend.constants import MIN_INGREDIENT_AMOUNT
+from constants import MIN_INGREDIENT_AMOUNT
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )

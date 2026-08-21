@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from backend.constants import (
+from constants import (
     MAX_LENGTH_USER_EMAIL, MAX_LENGTH_USER_FIRST_NAME,
     MAX_LENGTH_USER_LAST_NAME,
 )
