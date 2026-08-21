@@ -1,6 +1,11 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+from backend.constants import (
+    MAX_LENGTH_USER_EMAIL, MAX_LENGTH_USER_FIRST_NAME,
+    MAX_LENGTH_USER_LAST_NAME,
+)
+
 
 class User(AbstractUser):
     avatar = models.ImageField(
@@ -9,10 +14,27 @@ class User(AbstractUser):
         blank=True,
         null=True
     )
-    email = models.EmailField('email', max_length=254, unique=True)
+    email = models.EmailField(
+        'email',
+        max_length=MAX_LENGTH_USER_EMAIL,
+        unique=True
+    )
+    first_name = models.CharField(
+        'Имя',
+        max_length=MAX_LENGTH_USER_FIRST_NAME,
+        blank=False
+    )
+    last_name = models.CharField(
+        'Фамилия',
+        max_length=MAX_LENGTH_USER_LAST_NAME,
+        blank=False
+    )
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
 
     class Meta:
-        ordering = ('id',)
+        ordering = ('username',)
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 

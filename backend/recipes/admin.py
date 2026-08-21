@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from .models import Ingredient, Recipe, RecipeIngredient, Tag
+from .models import (
+    Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
+)
 
 
 @admin.register(Tag)
@@ -19,6 +21,7 @@ class IngredientAdmin(admin.ModelAdmin):
 class RecipeIngredientInline(admin.TabularInline):
     model = RecipeIngredient
     extra = 1
+    min_num = 1
     autocomplete_fields = ('ingredient',)
 
 
@@ -33,3 +36,13 @@ class RecipeAdmin(admin.ModelAdmin):
     @admin.display(description='В избранном')
     def favorited_count(self, obj):
         return obj.favorited_by.count()
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'recipe')
+
+
+@admin.register(ShoppingCart)
+class ShoppingCartAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'recipe')
