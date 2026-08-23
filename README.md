@@ -4,6 +4,9 @@
 подписываться на авторов и формировать список покупок. Проект выполнен в рамках
 учебного курса Яндекс Практикума.
 
+[![CI](https://github.com/Arthas996/foodgram/actions/workflows/main.yml/badge.svg)]
+(https://github.com/Arthas996/foodgram/actions)
+
 ---
 
 ## Деплой
@@ -87,6 +90,7 @@ docker compose -f docker-compose.production.yml up -d
 Документация API
 Спецификация API доступна по адресу (при запущенном сервере):
 http://127.0.0.1:8000/api/docs/
+https://foodgram96.work.gd/api/docs/
 
 Коллекция Postman для тестирования лежит в папке postman_collection/.
 

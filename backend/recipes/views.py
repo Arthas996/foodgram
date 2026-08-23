@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
+from api.filters import RecipeFilter
 from api.pagination import Pagination
 from api.serializers import (
     IngredientSerializer,
@@ -15,7 +16,6 @@ from api.serializers import (
     RecipeShortSerializer,
     TagSerializer,
 )
-from recipes.filters import RecipeFilter
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
@@ -104,22 +104,30 @@ class RecipeViewSet(viewsets.ModelViewSet):
         cart_items = ShoppingCart.objects.filter(user=user)
         recipes = [item.recipe for item in cart_items]
 
+        # Получаем все ингредиенты в одном запросе с аннотацией и сортировкой
         ingredients = (
             RecipeIngredient.objects
             .filter(recipe__in=recipes)
             .values('ingredient__name', 'ingredient__measurement_unit')
             .annotate(total=Sum('amount'))
+            .order_by('ingredient__name')
         )
 
+        # Формируем текстовый список (вынесено в отдельный метод для ясности)
+        content = self._prepare_shopping_list_text(ingredients)
+
+        # Возвращаем файл
+        return FileResponse(
+            content,
+            content_type='text/plain',
+            filename='shopping_list.txt'
+        )
+
+    def _prepare_shopping_list_text(self, ingredients):
+        """Формирует текст для списка покупок."""
         lines = [
             f"{ing['ingredient__name']} "
             f"({ing['ingredient__measurement_unit']}) — {ing['total']}"
             for ing in ingredients
         ]
-        content = "\n".join(lines)
-        response = FileResponse(
-            content,
-            content_type='text/plain',
-            filename='shopping_list.txt'
-        )
-        return response
+        return "\n".join(lines)

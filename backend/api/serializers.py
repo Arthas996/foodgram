@@ -1,4 +1,3 @@
-
 from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 
@@ -7,26 +6,6 @@ from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
 from users.models import User
-
-
-class UserCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = (
-            'id',
-            'email',
-            'username',
-            'first_name',
-            'last_name',
-            'password'
-        )
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
-
-    def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
-        return user
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -40,9 +19,11 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return False
-        return request.user.follower.filter(author=obj).exists()
+        return (
+            request
+            and request.user.is_authenticated
+            and request.user.follower.filter(author=obj).exists()
+        )
 
 
 class UserWithRecipesSerializer(UserSerializer):
@@ -127,15 +108,17 @@ class RecipeSerializer(serializers.ModelSerializer):
 
     def get_is_favorited(self, obj):
         user = self.context.get('request').user
-        if not user.is_authenticated:
-            return False
-        return user.favorites.filter(recipe=obj).exists()
+        return (
+            user.is_authenticated
+            and user.favorites.filter(recipe=obj).exists()
+        )
 
     def get_is_in_shopping_cart(self, obj):
         user = self.context.get('request').user
-        if not user.is_authenticated:
-            return False
-        return user.shoppingcarts.filter(recipe=obj).exists()
+        return (
+            user.is_authenticated
+            and user.shoppingcarts.filter(recipe=obj).exists()
+        )
 
 
 class RecipeIngredientCreateSerializer(serializers.Serializer):
@@ -173,11 +156,9 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        if 'tags' in validated_data:
-            instance.tags.set(validated_data.pop('tags'))
-        if 'ingredients' in validated_data:
-            instance.recipe_ingredients.all().delete()
-            self._add_ingredients(instance, validated_data.pop('ingredients'))
+        instance.tags.set(validated_data.pop('tags'))
+        instance.recipe_ingredients.all().delete()
+        self._add_ingredients(instance, validated_data.pop('ingredients'))
         return super().update(instance, validated_data)
 
     def _add_ingredients(self, recipe, ingredients_data):
