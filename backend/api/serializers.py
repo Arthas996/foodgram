@@ -9,6 +9,8 @@ from users.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    """Сериализатор для модели пользователя."""
+
     is_subscribed = serializers.SerializerMethodField()
     avatar = serializers.ImageField(read_only=True)
 
@@ -27,6 +29,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserWithRecipesSerializer(UserSerializer):
+    """Сериализатор для пользователя с его рецептами (для подписок)."""
+
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.IntegerField(
         source='recipes.count',
@@ -37,7 +41,6 @@ class UserWithRecipesSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ('recipes', 'recipes_count')
 
     def get_recipes(self, obj):
-        from api.serializers import RecipeShortSerializer
         request = self.context.get('request')
         limit = request.query_params.get('recipes_limit')
         queryset = obj.recipes.all()
@@ -51,12 +54,16 @@ class UserWithRecipesSerializer(UserSerializer):
 
 
 class TagSerializer(serializers.ModelSerializer):
+    """Сериализатор для тегов."""
+
     class Meta:
         model = Tag
         fields = ('id', 'name', 'slug')
 
 
 class IngredientSerializer(serializers.ModelSerializer):
+    """Сериализатор для ингредиентов."""
+
     class Meta:
         model = Ingredient
         fields = ('id', 'name', 'measurement_unit')
@@ -78,6 +85,7 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
 
 class RecipeShortSerializer(serializers.ModelSerializer):
     """Краткий сериализатор для рецептов (избранное, корзина, подписки)."""
+
     image = serializers.ImageField()
 
     class Meta:
@@ -87,6 +95,7 @@ class RecipeShortSerializer(serializers.ModelSerializer):
 
 class RecipeSerializer(serializers.ModelSerializer):
     """Полный сериализатор для рецепта (GET)."""
+
     author = UserSerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     ingredients = RecipeIngredientSerializer(
@@ -123,6 +132,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
 class RecipeIngredientCreateSerializer(serializers.Serializer):
     """Сериализатор для создания ингредиентов в рецепте."""
+
     id = serializers.PrimaryKeyRelatedField(
         queryset=Ingredient.objects.all()
     )
@@ -131,6 +141,7 @@ class RecipeIngredientCreateSerializer(serializers.Serializer):
 
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецепта."""
+
     id = serializers.IntegerField(read_only=True)
     image = Base64ImageField()
     ingredients = RecipeIngredientCreateSerializer(many=True, write_only=True)
@@ -174,6 +185,8 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class FavoriteSerializer(serializers.ModelSerializer):
+    """Сериализатор для избранного."""
+
     class Meta:
         model = Favorite
         fields = ('user', 'recipe')
@@ -184,6 +197,8 @@ class FavoriteSerializer(serializers.ModelSerializer):
 
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
+    """Сериализатор для списка покупок."""
+
     class Meta:
         model = ShoppingCart
         fields = ('user', 'recipe')

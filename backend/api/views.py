@@ -15,19 +15,23 @@ from api.serializers import (
     RecipeSerializer,
     RecipeShortSerializer,
     TagSerializer,
+    UserWithRecipesSerializer,
 )
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
+from users.models import Subscription, User
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
+    """Вьюсет для тегов."""
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """Вьюсет для ингредиентов с поиском по имени."""
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -41,6 +45,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
+    """Вьюсет для рецептов."""
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
@@ -104,7 +109,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         cart_items = ShoppingCart.objects.filter(user=user)
         recipes = [item.recipe for item in cart_items]
 
-        # Получаем все ингредиенты в одном запросе с аннотацией и сортировкой
         ingredients = (
             RecipeIngredient.objects
             .filter(recipe__in=recipes)
@@ -113,15 +117,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             .order_by('ingredient__name')
         )
 
-        # Формируем текстовый список (вынесено в отдельный метод для ясности)
         content = self._prepare_shopping_list_text(ingredients)
-
-        # Возвращаем файл
-        return FileResponse(
-            content,
-            content_type='text/plain',
-            filename='shopping_list.txt'
-        )
+        return self._create_file_response(content)
 
     def _prepare_shopping_list_text(self, ingredients):
         """Формирует текст для списка покупок."""
@@ -131,3 +128,78 @@ class RecipeViewSet(viewsets.ModelViewSet):
             for ing in ingredients
         ]
         return "\n".join(lines)
+
+    def _create_file_response(self, content):
+        """Создаёт FileResponse для скачивания списка покупок."""
+        return FileResponse(
+            content,
+            content_type='text/plain',
+            filename='shopping_list.txt'
+        )
+
+
+class UserViewSet(viewsets.GenericViewSet):
+    """Вьюсет для пользователей (регистрация, профиль, подписки)."""
+    queryset = User.objects.all()
+    serializer_class = UserWithRecipesSerializer
+    pagination_class = Pagination
+
+    def get_serializer_class(self):
+        if self.action == 'subscriptions':
+            return UserWithRecipesSerializer
+        return super().get_serializer_class()
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post', 'delete'])
+    def subscribe(self, request, pk=None):
+        author = get_object_or_404(User, id=pk)
+        user = request.user
+
+        if request.method == 'POST':
+            if user == author:
+                return Response(
+                    {'error': 'Нельзя подписаться на себя'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            sub, created = Subscription.objects.get_or_create(
+                user=user, author=author
+            )
+            if not created:
+                return Response(
+                    {'error': 'Уже подписаны'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            serializer = UserWithRecipesSerializer(
+                author, context={'request': request}
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        # DELETE
+        deleted, _ = Subscription.objects.filter(
+            user=user, author=author
+        ).delete()
+        if deleted == 0:
+            return Response(
+                {'error': 'Вы не подписаны'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'])
+    def subscriptions(self, request):
+        user = request.user
+        authors = User.objects.filter(following__user=user).distinct()
+        page = self.paginate_queryset(authors)
+        if page is not None:
+            serializer = UserWithRecipesSerializer(
+                page, many=True, context={'request': request}
+            )
+            return self.get_paginated_response(serializer.data)
+        serializer = UserWithRecipesSerializer(
+            authors, many=True, context={'request': request}
+        )
+        return Response(serializer.data)
