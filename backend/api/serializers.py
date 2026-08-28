@@ -157,6 +157,22 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
             'cooking_time', 'ingredients', 'tags'
         )
 
+    def validate_ingredients(self, value):
+        """Проверка на повторяющиеся ингредиенты."""
+        ids = [item['id'].id for item in value]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError(
+                'Ингредиенты не должны повторяться.'
+            )
+        return value
+
+    def validate_tags(self, value):
+        """Проверка на повторяющиеся теги."""
+
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError('Теги не должны повторяться.')
+        return value
+
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
         tags_data = validated_data.pop('tags')

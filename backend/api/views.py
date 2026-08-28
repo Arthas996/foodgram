@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from api.filters import RecipeFilter
 from api.pagination import Pagination
+from api.permissions import IsAuthorOrReadOnly
 from api.serializers import (
     IngredientSerializer,
     RecipeCreateUpdateSerializer,
@@ -48,7 +49,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     """Вьюсет для рецептов."""
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
