@@ -2,7 +2,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 from constants import (
-    MAX_LENGTH_USER_EMAIL, MAX_LENGTH_USER_FIRST_NAME,
+    MAX_LENGTH_USER_EMAIL,
+    MAX_LENGTH_USER_FIRST_NAME,
     MAX_LENGTH_USER_LAST_NAME,
 )
 
@@ -18,17 +19,17 @@ class User(AbstractUser):
         'email',
         max_length=MAX_LENGTH_USER_EMAIL,
         unique=True,
-        blank=False
+        blank=False,
     )
     first_name = models.CharField(
         'Имя',
         max_length=MAX_LENGTH_USER_FIRST_NAME,
-        blank=False
+        blank=False,
     )
     last_name = models.CharField(
         'Фамилия',
         max_length=MAX_LENGTH_USER_LAST_NAME,
-        blank=False
+        blank=False,
     )
 
     USERNAME_FIELD = 'email'
@@ -44,7 +45,6 @@ class User(AbstractUser):
 
 
 class Subscription(models.Model):
-    """Модель подписки на автора."""
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
