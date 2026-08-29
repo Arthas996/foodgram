@@ -1,11 +1,28 @@
 from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
+from djoser.serializers import UserCreateSerializer as BaseUserCreateSerializer
 
 from constants import MIN_INGREDIENT_AMOUNT
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
 from users.models import User
+
+
+class UserCreateSerializer(BaseUserCreateSerializer):
+    """Сериализатор для регистрации пользователя."""
+    first_name = serializers.CharField(required=True, max_length=150)
+    last_name = serializers.CharField(required=True, max_length=150)
+
+    class Meta(BaseUserCreateSerializer.Meta):
+        model = User
+        fields = (
+            'id', 'email', 'username',
+            'first_name', 'last_name', 'password'
+        )
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
 
 
 class UserSerializer(serializers.ModelSerializer):
