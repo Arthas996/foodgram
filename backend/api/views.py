@@ -125,7 +125,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
         try:
-            obj, created = model.objects.get_or_create(user=user, recipe=recipe)
+            obj, created = (
+                model.objects.get_or_create(user=user, recipe=recipe)
+            )
         except Exception as e:
             return Response(
                 {'error': str(e)},
@@ -144,7 +146,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def _remove_from_related(self, model, request, pk):
         user = request.user
         try:
-            deleted, _ = model.objects.filter(user=user, recipe__id=pk).delete()
+            deleted, _ = (
+                model.objects
+                .filter(user=user, recipe__id=pk)
+                .delete()
+            )
         except Exception as e:
             return Response(
                 {'error': str(e)},
