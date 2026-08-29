@@ -124,6 +124,7 @@ DJOSER = {
     'LOGIN_FIELD': 'email',
     'HIDE_USERS': True,
     'SERIALIZERS': {
+        'user_create': 'users.serializers.UserCreateSerializer',
         'user': 'api.serializers.UserSerializer',
         'current_user': 'api.serializers.UserSerializer',
     },
@@ -132,3 +133,7 @@ DJOSER = {
 # Настройки для продакшена
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
+CSRF_TRUSTED_ORIGINS = [
+    'http://FOODGRAM96.WORK.GD',
+    'https://FOODGRAM96.WORK.GD',
+]

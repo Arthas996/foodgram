@@ -28,31 +28,6 @@ class UserSerializer(serializers.ModelSerializer):
         )
 
 
-class UserWithRecipesSerializer(UserSerializer):
-    """Сериализатор для пользователя с его рецептами (для подписок)."""
-
-    recipes = serializers.SerializerMethodField()
-    recipes_count = serializers.IntegerField(
-        source='recipes.count',
-        read_only=True
-    )
-
-    class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ('recipes', 'recipes_count')
-
-    def get_recipes(self, obj):
-        request = self.context.get('request')
-        limit = request.query_params.get('recipes_limit')
-        queryset = obj.recipes.all()
-        if limit and limit.isdigit():
-            queryset = queryset[:int(limit)]
-        return RecipeShortSerializer(
-            queryset,
-            many=True,
-            context={'request': request}
-        ).data
-
-
 class TagSerializer(serializers.ModelSerializer):
     """Сериализатор для тегов."""
 
@@ -91,6 +66,31 @@ class RecipeShortSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = ('id', 'name', 'image', 'cooking_time')
+
+
+class UserWithRecipesSerializer(UserSerializer):
+    """Сериализатор для пользователя с его рецептами (для подписок)."""
+
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.IntegerField(
+        source='recipes.count',
+        read_only=True
+    )
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ('recipes', 'recipes_count')
+
+    def get_recipes(self, obj):
+        request = self.context.get('request')
+        limit = request.query_params.get('recipes_limit')
+        queryset = obj.recipes.all()
+        if limit and limit.isdigit():
+            queryset = queryset[:int(limit)]
+        return RecipeShortSerializer(
+            queryset,
+            many=True,
+            context={'request': request}
+        ).data
 
 
 class RecipeSerializer(serializers.ModelSerializer):
@@ -168,7 +168,6 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
 
     def validate_tags(self, value):
         """Проверка на повторяющиеся теги."""
-
         if len(value) != len(set(value)):
             raise serializers.ValidationError('Теги не должны повторяться.')
         return value

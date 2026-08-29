@@ -26,6 +26,7 @@ from users.models import Subscription, User
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для тегов."""
+
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
@@ -33,6 +34,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для ингредиентов с поиском по имени."""
+
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -47,6 +49,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 class RecipeViewSet(viewsets.ModelViewSet):
     """Вьюсет для рецептов."""
+
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
@@ -141,6 +144,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 class UserViewSet(viewsets.GenericViewSet):
     """Вьюсет для пользователей (регистрация, профиль, подписки)."""
+
     queryset = User.objects.all()
     serializer_class = UserWithRecipesSerializer
     pagination_class = Pagination
