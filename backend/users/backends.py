@@ -3,10 +3,12 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+
 class EmailBackend(ModelBackend):
     """
     Аутентификация по email.
     """
+
     def authenticate(self, request, username=None, password=None, **kwargs):
         if username is None:
             username = kwargs.get('email')
