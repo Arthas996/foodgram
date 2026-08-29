@@ -21,12 +21,12 @@ from api.serializers import (
     RecipeShortSerializer,
     TagSerializer,
     UserWithRecipesSerializer,
+    UserCreateSerializer,
 )
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
 from users.models import Subscription, User
-from users.serializers import UserCreateSerializer
 
 
 class AvatarView(APIView):
