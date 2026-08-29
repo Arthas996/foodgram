@@ -7,26 +7,6 @@ from recipes.models import (
 )
 from users.models import User
 
-from django.contrib.auth import get_user_model
-
-
-class EmailTokenObtainPairSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(style={'input_type': 'password'})
-
-    def validate(self, attrs):
-        User = get_user_model()
-        email = attrs.get('email')
-        password = attrs.get('password')
-
-        if email and password:
-            user = User.objects.filter(email=email).first()
-            if user and user.check_password(password):
-                attrs['user'] = user
-                return attrs
-            raise serializers.ValidationError('Неверные учетные данные')
-        raise serializers.ValidationError('Укажите email и пароль')
-
 
 class UserSerializer(serializers.ModelSerializer):
     """Сериализатор для модели пользователя."""

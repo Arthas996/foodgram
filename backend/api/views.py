@@ -1,11 +1,15 @@
+import base64
+
+from django.core.files.base import ContentFile
 from django.db.models import Sum
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from api.filters import RecipeFilter
 from api.pagination import Pagination
@@ -22,11 +26,48 @@ from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
 )
 from users.models import Subscription, User
+from users.serializers import UserCreateSerializer
+
+
+class AvatarView(APIView):
+    """Представление для добавления и удаления аватара."""
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        user = request.user
+        avatar_data = request.data.get('avatar')
+        if not avatar_data:
+            return Response(
+                {'avatar': 'Это поле обязательно.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            format, imgstr = avatar_data.split(';base64,')
+            ext = format.split('/')[-1]
+            data = ContentFile(
+                base64.b64decode(imgstr),
+                name=f'avatar_{user.id}.{ext}'
+            )
+            user.avatar.save(data.name, data, save=True)
+        except Exception:
+            return Response(
+                {'avatar': 'Неверный формат изображения'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return Response(
+            {'avatar': request.build_absolute_uri(user.avatar.url)},
+            status=status.HTTP_200_OK
+        )
+
+    def delete(self, request):
+        user = request.user
+        if user.avatar:
+            user.avatar.delete(save=True)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для тегов."""
-
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
@@ -34,7 +75,6 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для ингредиентов с поиском по имени."""
-
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -49,7 +89,6 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 class RecipeViewSet(viewsets.ModelViewSet):
     """Вьюсет для рецептов."""
-
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
@@ -142,9 +181,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
 
 
-class UserViewSet(viewsets.GenericViewSet):
+class UserViewSet(mixins.CreateModelMixin,
+                  mixins.ListModelMixin,
+                  mixins.RetrieveModelMixin,
+                  viewsets.GenericViewSet):
     """Вьюсет для пользователей (регистрация, профиль, подписки)."""
-
     queryset = User.objects.all()
     serializer_class = UserWithRecipesSerializer
     pagination_class = Pagination
@@ -152,6 +193,8 @@ class UserViewSet(viewsets.GenericViewSet):
     def get_serializer_class(self):
         if self.action == 'subscriptions':
             return UserWithRecipesSerializer
+        if self.action == 'create':
+            return UserCreateSerializer
         return super().get_serializer_class()
 
     @action(detail=False, methods=['get'])
@@ -183,7 +226,6 @@ class UserViewSet(viewsets.GenericViewSet):
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        # DELETE
         deleted, _ = Subscription.objects.filter(
             user=user, author=author
         ).delete()
