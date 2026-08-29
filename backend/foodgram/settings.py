@@ -154,13 +154,9 @@ DJOSER = {
         'user_create': 'users.serializers.UserCreateSerializer',
         'user': 'api.serializers.UserSerializer',
         'current_user': 'api.serializers.UserSerializer',
+        'token_create': 'api.serializers.EmailTokenObtainPairSerializer'
     },
 }
-
-AUTHENTICATION_BACKENDS = [
-    'users.backends.EmailBackend',
-    'django.contrib.auth.backends.ModelBackend',
-]
 
 # Настройки для продакшена
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
