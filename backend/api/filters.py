@@ -13,23 +13,28 @@ class RecipeFilter(filters.FilterSet):
         fields = ('tags', 'author', 'is_favorited', 'is_in_shopping_cart')
 
     def filter_tags(self, queryset, name, value):
-        if not value:
+        # Получаем все значения из query-параметра tags (список)
+        tags_list = self.request.query_params.getlist('tags')
+        if not tags_list:
             return queryset
-        tags_slugs = [slug.strip() for slug in value.split(',') if slug.strip()]
+        # Удаляем пустые строки
+        tags_slugs = [slug.strip() for slug in tags_list if slug.strip()]
+        if not tags_slugs:
+            return queryset
         return queryset.filter(tags__slug__in=tags_slugs).distinct()
 
     def filter_favorited(self, queryset, name, value):
+        # value может быть '1', '0' или None
         user = self.request.user
-        if value:
-            if user.is_authenticated:
+        if value and user.is_authenticated:
+            # Проверяем, что value равно 1 (или true)
+            if str(value) in ('1', 'true', 'True'):
                 return queryset.filter(favorited_by__user=user)
-            return queryset.none()
         return queryset
 
     def filter_shopping_cart(self, queryset, name, value):
         user = self.request.user
-        if value:
-            if user.is_authenticated:
+        if value and user.is_authenticated:
+            if str(value) in ('1', 'true', 'True'):
                 return queryset.filter(in_shopping_cart__user=user)
-            return queryset.none()
         return queryset

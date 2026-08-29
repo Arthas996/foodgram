@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,8 +20,8 @@ from api.serializers import (
     RecipeSerializer,
     RecipeShortSerializer,
     TagSerializer,
-    UserWithRecipesSerializer,
     UserCreateSerializer,
+    UserWithRecipesSerializer,
 )
 from recipes.models import (
     Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
@@ -189,6 +189,11 @@ class UserViewSet(mixins.CreateModelMixin,
     queryset = User.objects.all()
     serializer_class = UserWithRecipesSerializer
     pagination_class = Pagination
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [AllowAny()]
+        return super().get_permissions()
 
     def get_serializer_class(self):
         if self.action == 'subscriptions':

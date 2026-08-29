@@ -1,4 +1,3 @@
-from drf_extra_fields.fields import Base64ImageField
 from rest_framework import serializers
 from djoser.serializers import UserCreateSerializer as BaseUserCreateSerializer
 
@@ -99,7 +98,7 @@ class UserWithRecipesSerializer(UserSerializer):
 
     def get_recipes(self, obj):
         request = self.context.get('request')
-        limit = request.query_params.get('recipes_limit')
+        limit = request.query_params.get('recipes_limit') if request else None
         queryset = obj.recipes.all()
         if limit and limit.isdigit():
             queryset = queryset[:int(limit)]
@@ -133,18 +132,16 @@ class RecipeSerializer(serializers.ModelSerializer):
         )
 
     def get_is_favorited(self, obj):
-        user = self.context.get('request').user
-        return (
-            user.is_authenticated
-            and user.favorites.filter(recipe=obj).exists()
-        )
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return request.user.favorites.filter(recipe=obj).exists()
+        return False
 
     def get_is_in_shopping_cart(self, obj):
-        user = self.context.get('request').user
-        return (
-            user.is_authenticated
-            and user.shoppingcarts.filter(recipe=obj).exists()
-        )
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return request.user.shoppingcarts.filter(recipe=obj).exists()
+        return False
 
 
 class RecipeIngredientCreateSerializer(serializers.Serializer):
@@ -160,7 +157,7 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецепта."""
 
     id = serializers.IntegerField(read_only=True)
-    image = Base64ImageField()
+    image = serializers.ImageField()  # заменили Base64ImageField
     ingredients = RecipeIngredientCreateSerializer(many=True, write_only=True)
     tags = serializers.PrimaryKeyRelatedField(
         queryset=Tag.objects.all(),
@@ -175,19 +172,27 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         )
 
     def validate_ingredients(self, value):
-        """Проверка на повторяющиеся ингредиенты."""
+        """Проверка на пустой список и дубли."""
+        if not value:
+            raise serializers.ValidationError('Необходимо указать хотя бы один ингредиент.')
         ids = [item['id'].id for item in value]
         if len(ids) != len(set(ids)):
-            raise serializers.ValidationError(
-                'Ингредиенты не должны повторяться.'
-            )
+            raise serializers.ValidationError('Ингредиенты не должны повторяться.')
         return value
 
     def validate_tags(self, value):
-        """Проверка на повторяющиеся теги."""
+        """Проверка на пустой список и дубли."""
+        if not value:
+            raise serializers.ValidationError('Необходимо указать хотя бы один тег.')
         if len(value) != len(set(value)):
             raise serializers.ValidationError('Теги не должны повторяться.')
         return value
+
+    def validate(self, data):
+        """Проверка наличия изображения."""
+        if not data.get('image'):
+            raise serializers.ValidationError({'image': 'Изображение обязательно.'})
+        return data
 
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
@@ -199,9 +204,14 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        instance.tags.set(validated_data.pop('tags'))
-        instance.recipe_ingredients.all().delete()
-        self._add_ingredients(instance, validated_data.pop('ingredients'))
+        # Безопасное обновление: если поля переданы – обновляем, иначе не трогаем
+        if 'tags' in validated_data:
+            instance.tags.set(validated_data.pop('tags'))
+        if 'ingredients' in validated_data:
+            instance.recipe_ingredients.all().delete()
+            ingredients_data = validated_data.pop('ingredients')
+            self._add_ingredients(instance, ingredients_data)
+        # Обновляем остальные поля (name, image, text, cooking_time)
         return super().update(instance, validated_data)
 
     def _add_ingredients(self, recipe, ingredients_data):
