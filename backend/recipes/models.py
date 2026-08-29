@@ -129,6 +129,7 @@ class RecipeIngredient(models.Model):
 
 class BaseFavoriteShopping(models.Model):
     """Абстрактная модель для избранного и корзины."""
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,

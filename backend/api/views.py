@@ -7,7 +7,11 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,16 +25,23 @@ from api.serializers import (
     RecipeShortSerializer,
     TagSerializer,
     UserCreateSerializer,
+    UserSerializer,
     UserWithRecipesSerializer,
 )
 from recipes.models import (
-    Favorite, Ingredient, Recipe, RecipeIngredient, ShoppingCart, Tag
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Tag,
 )
 from users.models import Subscription, User
 
 
 class AvatarView(APIView):
     """Представление для добавления и удаления аватара."""
+
     permission_classes = [IsAuthenticated]
 
     def put(self, request):
@@ -39,24 +50,24 @@ class AvatarView(APIView):
         if not avatar_data:
             return Response(
                 {'avatar': 'Это поле обязательно.'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
         try:
             format, imgstr = avatar_data.split(';base64,')
             ext = format.split('/')[-1]
             data = ContentFile(
                 base64.b64decode(imgstr),
-                name=f'avatar_{user.id}.{ext}'
+                name=f'avatar_{user.id}.{ext}',
             )
             user.avatar.save(data.name, data, save=True)
         except Exception:
             return Response(
                 {'avatar': 'Неверный формат изображения'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
             {'avatar': request.build_absolute_uri(user.avatar.url)},
-            status=status.HTTP_200_OK
+            status=status.HTTP_200_OK,
         )
 
     def delete(self, request):
@@ -68,6 +79,7 @@ class AvatarView(APIView):
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для тегов."""
+
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
@@ -75,6 +87,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для ингредиентов с поиском по имени."""
+
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -89,9 +102,13 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 class RecipeViewSet(viewsets.ModelViewSet):
     """Вьюсет для рецептов."""
+
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
+    permission_classes = [
+        IsAuthenticatedOrReadOnly,
+        IsAuthorOrReadOnly,
+    ]
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
@@ -107,24 +124,36 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def _add_to_related(self, model, request, pk):
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
-        obj, created = model.objects.get_or_create(user=user, recipe=recipe)
+        try:
+            obj, created = model.objects.get_or_create(user=user, recipe=recipe)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not created:
             return Response(
                 {'error': 'Уже добавлено'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
             RecipeShortSerializer(recipe, context={'request': request}).data,
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
 
     def _remove_from_related(self, model, request, pk):
         user = request.user
-        deleted, _ = model.objects.filter(user=user, recipe__id=pk).delete()
+        try:
+            deleted, _ = model.objects.filter(user=user, recipe__id=pk).delete()
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if deleted == 0:
             return Response(
                 {'error': 'Не найдено'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_404_NOT_FOUND,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -143,7 +172,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def get_link(self, request, pk=None):
         recipe = get_object_or_404(Recipe, id=pk)
-        short_link = f"{request.build_absolute_uri('/')[:-1]}/s/{recipe.id}"
+        base_url = request.build_absolute_uri('/')[:-1]
+        short_link = f'{base_url}/s/{recipe.id}'
         return Response({'short-link': short_link})
 
     @action(detail=False, methods=['get'])
@@ -151,7 +181,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         user = request.user
         cart_items = ShoppingCart.objects.filter(user=user)
         recipes = [item.recipe for item in cart_items]
-
         ingredients = (
             RecipeIngredient.objects
             .filter(recipe__in=recipes)
@@ -159,33 +188,33 @@ class RecipeViewSet(viewsets.ModelViewSet):
             .annotate(total=Sum('amount'))
             .order_by('ingredient__name')
         )
-
         content = self._prepare_shopping_list_text(ingredients)
         return self._create_file_response(content)
 
     def _prepare_shopping_list_text(self, ingredients):
-        """Формирует текст для списка покупок."""
         lines = [
             f"{ing['ingredient__name']} "
             f"({ing['ingredient__measurement_unit']}) — {ing['total']}"
             for ing in ingredients
         ]
-        return "\n".join(lines)
+        return '\n'.join(lines)
 
     def _create_file_response(self, content):
-        """Создаёт FileResponse для скачивания списка покупок."""
         return FileResponse(
             content,
             content_type='text/plain',
-            filename='shopping_list.txt'
+            filename='shopping_list.txt',
         )
 
 
-class UserViewSet(mixins.CreateModelMixin,
-                  mixins.ListModelMixin,
-                  mixins.RetrieveModelMixin,
-                  viewsets.GenericViewSet):
+class UserViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
     """Вьюсет для пользователей (регистрация, профиль, подписки)."""
+
     queryset = User.objects.all()
     serializer_class = UserWithRecipesSerializer
     pagination_class = Pagination
@@ -193,6 +222,8 @@ class UserViewSet(mixins.CreateModelMixin,
     def get_permissions(self):
         if self.action == 'create':
             return [AllowAny()]
+        if self.action == 'me':
+            return [IsAuthenticated()]
         return super().get_permissions()
 
     def get_serializer_class(self):
@@ -200,7 +231,8 @@ class UserViewSet(mixins.CreateModelMixin,
             return UserWithRecipesSerializer
         if self.action == 'create':
             return UserCreateSerializer
-        return super().get_serializer_class()
+        # Для list, retrieve, me используем базовый сериализатор
+        return UserSerializer
 
     @action(detail=False, methods=['get'])
     def me(self, request):
@@ -216,28 +248,34 @@ class UserViewSet(mixins.CreateModelMixin,
             if user == author:
                 return Response(
                     {'error': 'Нельзя подписаться на себя'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
             sub, created = Subscription.objects.get_or_create(
-                user=user, author=author
+                user=user,
+                author=author,
             )
             if not created:
                 return Response(
                     {'error': 'Уже подписаны'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
             serializer = UserWithRecipesSerializer(
-                author, context={'request': request}
+                author,
+                context={'request': request},
             )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED,
+            )
 
         deleted, _ = Subscription.objects.filter(
-            user=user, author=author
+            user=user,
+            author=author,
         ).delete()
         if deleted == 0:
             return Response(
                 {'error': 'Вы не подписаны'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -248,10 +286,14 @@ class UserViewSet(mixins.CreateModelMixin,
         page = self.paginate_queryset(authors)
         if page is not None:
             serializer = UserWithRecipesSerializer(
-                page, many=True, context={'request': request}
+                page,
+                many=True,
+                context={'request': request},
             )
             return self.get_paginated_response(serializer.data)
         serializer = UserWithRecipesSerializer(
-            authors, many=True, context={'request': request}
+            authors,
+            many=True,
+            context={'request': request},
         )
         return Response(serializer.data)
