@@ -28,27 +28,19 @@ from api.serializers import (
     UserWithRecipesSerializer,
 )
 from recipes.models import (
-    Favorite,
-    Ingredient,
-    Recipe,
-    RecipeIngredient,
-    ShoppingCart,
-    Tag,
+    Favorite, Ingredient, Recipe, RecipeIngredient,
+    ShoppingCart, Tag,
 )
 from users.models import Subscription, User
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
-    """Вьюсет для модели Tag (теги). Доступен только для чтения."""
-
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
-    """Вьюсет для модели Ingredient (ингред.). Доступен только для чтения."""
-
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -62,13 +54,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    """
-    Вьюсет для модели Recipe (рецепты).
-
-    Поддерживает создание, редактирование, удаление, просмотр,
-    а также добавление в избранное/корзину, получение короткой ссылки
-    и скачивание списка покупок.
-    """
+    http_method_names = ['get', 'post', 'patch', 'delete']
 
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
@@ -81,46 +67,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if self.action in ('create', 'update', 'partial_update'):
             return RecipeCreateUpdateSerializer
         return RecipeSerializer
-
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        output_serializer = RecipeSerializer(
-            serializer.instance,
-            context={'request': request}
-        )
-        return Response(
-            output_serializer.data,
-            status=status.HTTP_201_CREATED,
-            headers=headers
-        )
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = (
-            self.get_serializer(
-                instance,
-                data=request.data,
-                partial=partial
-            )
-        )
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        output_serializer = RecipeSerializer(
-            instance,
-            context={'request': request}
-        )
-        return Response(output_serializer.data)
-
-    def partial_update(self, request, *args, **kwargs):
-        kwargs['partial'] = True
-        return self.update(request, *args, **kwargs)
 
     def _add_to_related(self, model, request, pk):
         recipe = get_object_or_404(Recipe, id=pk)
@@ -137,7 +83,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
 
     def _remove_from_related(self, model, request, pk):
-        # Исправление: сначала проверяем существование рецепта
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
         deleted, _ = model.objects.filter(
@@ -202,12 +147,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 
 class UserViewSet(DjoserUserViewSet):
-    """
-    Кастомизированный вьюсет для модели User.
-
-    Добавляет поддержку подписок, аватара и переопределяет метод me.
-    """
-
     serializer_class = UserSerializer
 
     def get_permissions(self):
@@ -285,8 +224,7 @@ class UserViewSet(DjoserUserViewSet):
         )
         return Response(serializer.data)
 
-    @action(detail=False, methods=['put', 'delete'],
-            url_path='me/avatar')
+    @action(detail=False, methods=['put', 'delete'], url_path='me/avatar')
     def avatar(self, request):
         user = request.user
         if request.method == 'PUT':
