@@ -88,9 +88,9 @@ docker compose -f docker-compose.production.yml up -d
 Приложение будет доступно по адресу http://localhost:9001 (порт можно изменить)
 
 Документация API
-Спецификация API доступна по адресу (при запущенном сервере):
+Спецификация API доступна по адресу:
 http://127.0.0.1:8000/api/docs/
-https://foodgram96.work.gd/api/docs/
+
 
 Коллекция Postman для тестирования лежит в папке postman_collection/.
 
