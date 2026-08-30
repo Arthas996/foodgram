@@ -47,7 +47,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
-    """Вьюсет для модели Ingredient (ингредиенты). Доступен только для чтения."""
+    """Вьюсет для модели Ingredient (ингред.). Доступен только для чтения."""
 
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
@@ -103,10 +103,19 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = (
+            self.get_serializer(
+                instance,
+                data=request.data,
+                partial=partial
+            )
+        )
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        output_serializer = RecipeSerializer(instance, context={'request': request})
+        output_serializer = RecipeSerializer(
+            instance,
+            context={'request': request}
+        )
         return Response(output_serializer.data)
 
     def partial_update(self, request, *args, **kwargs):

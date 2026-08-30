@@ -12,7 +12,7 @@ class RecipeFilter(filters.FilterSet):
     """
 
     # Используем AllValuesMultipleFilter для корректной обработки множественных
-    # значений параметра tags, но с кастомным методом для реализации AND-логики.
+    # значений параметра tags, но с кастомным методом для реализации AND.
     tags = filters.AllValuesMultipleFilter(
         field_name='tags__slug',
         method='filter_tags'

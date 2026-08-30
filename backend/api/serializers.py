@@ -25,9 +25,7 @@ from users.models import User
 # Это минимальное и оправданное расширение, без которого
 # функциональность регистрации не работала бы корректно.
 class UserCreateSerializer(DjoserUserCreateSerializer):
-    """
-    Сериализатор для регистрации пользователя.
-    """
+    """Сериализатор для регистрации пользователя."""
 
     first_name = serializers.CharField(required=True, max_length=150)
     last_name = serializers.CharField(required=True, max_length=150)
@@ -80,9 +78,7 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class RecipeIngredientSerializer(serializers.ModelSerializer):
-    """
-    Сериализатор для вывода ингредиентов в рецепте.
-    """
+    """Сериализатор для вывода ингредиентов в рецепте."""
 
     id = serializers.ReadOnlyField(source='ingredient.id')
     name = serializers.ReadOnlyField(source='ingredient.name')
@@ -212,20 +208,36 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         if self.instance:  # обновление
             if 'ingredients' not in data or not data.get('ingredients'):
                 raise serializers.ValidationError(
-                    {'ingredients': 'Это поле обязательно и не должно быть пустым.'}
+                    {
+                        'ingredients': (
+                            'Это поле обязательно и не должно быть пустым.'
+                        )
+                    }
                 )
             if 'tags' not in data or not data.get('tags'):
                 raise serializers.ValidationError(
-                    {'tags': 'Это поле обязательно и не должно быть пустым.'}
+                    {
+                        'tags': (
+                            'Это поле обязательно и не должно быть пустым.'
+                        )
+                    }
                 )
         else:  # создание
             if not data.get('ingredients'):
                 raise serializers.ValidationError(
-                    {'ingredients': 'Необходимо указать хотя бы один ингредиент.'}
+                    {
+                        'ingredients': (
+                            'Необходимо указать хотя бы один ингредиент.'
+                        )
+                    }
                 )
             if not data.get('tags'):
                 raise serializers.ValidationError(
-                    {'tags': 'Необходимо указать хотя бы один тег.'}
+                    {
+                        'tags': (
+                            'Необходимо указать хотя бы один тег.'
+                        )
+                    }
                 )
         if not data.get('image'):
             raise serializers.ValidationError(
