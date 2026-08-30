@@ -4,34 +4,44 @@ from recipes.models import Recipe
 
 
 class RecipeFilter(filters.FilterSet):
-    tags = filters.CharFilter(method='filter_tags')
-    author = filters.NumberFilter(field_name='author__id')
-    is_favorited = filters.NumberFilter(method='filter_favorited')
-    is_in_shopping_cart = filters.NumberFilter(method='filter_shopping_cart')
+    """
+    Фильтр для модели Recipe.
+
+    Позволяет фильтровать рецепты по тегам (пересечение), автору,
+    наличию в избранном и списке покупок.
+    """
+
+    # Используем AllValuesMultipleFilter для корректной обработки множественных
+    # значений параметра tags, но с кастомным методом для реализации AND-логики.
+    tags = filters.AllValuesMultipleFilter(
+        field_name='tags__slug',
+        method='filter_tags'
+    )
+    is_favorited = filters.BooleanFilter(method='filter_favorited')
+    is_in_shopping_cart = filters.BooleanFilter(method='filter_shopping_cart')
 
     class Meta:
         model = Recipe
         fields = ('tags', 'author', 'is_favorited', 'is_in_shopping_cart')
 
     def filter_tags(self, queryset, name, value):
-        tags_list = self.request.query_params.getlist('tags')
-        if not tags_list:
+        """
+        Фильтрует рецепты по пересечению всех переданных тегов (AND).
+        Ожидается параметр ?tags=slug1&tags=slug2
+        """
+        if not value:
             return queryset
-        tags_slugs = [slug.strip() for slug in tags_list if slug.strip()]
-        if not tags_slugs:
-            return queryset
-        return queryset.filter(tags__slug__in=tags_slugs).distinct()
+        for slug in value:
+            if slug:
+                queryset = queryset.filter(tags__slug=slug)
+        return queryset.distinct()
 
     def filter_favorited(self, queryset, name, value):
-        user = self.request.user
-        if value and user.is_authenticated:
-            if str(value) in ('1', 'true', 'True'):
-                return queryset.filter(favorites__user=user)
+        if value and self.request.user.is_authenticated:
+            return queryset.filter(favorites__user=self.request.user)
         return queryset
 
     def filter_shopping_cart(self, queryset, name, value):
-        user = self.request.user
-        if value and user.is_authenticated:
-            if str(value) in ('1', 'true', 'True'):
-                return queryset.filter(shoppingcarts__user=user)
+        if value and self.request.user.is_authenticated:
+            return queryset.filter(shoppingcarts__user=self.request.user)
         return queryset

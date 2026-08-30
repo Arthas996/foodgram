@@ -5,7 +5,8 @@ from django.db.models import Sum
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, status, viewsets
+from djoser.views import UserViewSet as DjoserUserViewSet
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import (
     AllowAny,
@@ -13,7 +14,6 @@ from rest_framework.permissions import (
     IsAuthenticatedOrReadOnly,
 )
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from api.filters import RecipeFilter
 from api.pagination import Pagination
@@ -24,7 +24,6 @@ from api.serializers import (
     RecipeSerializer,
     RecipeShortSerializer,
     TagSerializer,
-    UserCreateSerializer,
     UserSerializer,
     UserWithRecipesSerializer,
 )
@@ -39,46 +38,8 @@ from recipes.models import (
 from users.models import Subscription, User
 
 
-class AvatarView(APIView):
-    """Представление для добавления и удаления аватара."""
-
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request):
-        user = request.user
-        avatar_data = request.data.get('avatar')
-        if not avatar_data:
-            return Response(
-                {'avatar': 'Это поле обязательно.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            format, imgstr = avatar_data.split(';base64,')
-            ext = format.split('/')[-1]
-            data = ContentFile(
-                base64.b64decode(imgstr),
-                name=f'avatar_{user.id}.{ext}',
-            )
-            user.avatar.save(data.name, data, save=True)
-        except Exception:
-            return Response(
-                {'avatar': 'Неверный формат изображения'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response(
-            {'avatar': request.build_absolute_uri(user.avatar.url)},
-            status=status.HTTP_200_OK,
-        )
-
-    def delete(self, request):
-        user = request.user
-        if user.avatar:
-            user.avatar.delete(save=True)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
-    """Вьюсет для тегов."""
+    """Вьюсет для модели Tag (теги). Доступен только для чтения."""
 
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
@@ -86,7 +47,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
-    """Вьюсет для ингредиентов с поиском по имени."""
+    """Вьюсет для модели Ingredient (ингредиенты). Доступен только для чтения."""
 
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
@@ -101,14 +62,17 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    """Вьюсет для рецептов."""
+    """
+    Вьюсет для модели Recipe (рецепты).
+
+    Поддерживает создание, редактирование, удаление, просмотр,
+    а также добавление в избранное/корзину, получение короткой ссылки
+    и скачивание списка покупок.
+    """
 
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
-    permission_classes = [
-        IsAuthenticatedOrReadOnly,
-        IsAuthorOrReadOnly,
-    ]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrReadOnly]
     pagination_class = Pagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
@@ -121,45 +85,60 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        output_serializer = RecipeSerializer(
+            serializer.instance,
+            context={'request': request}
+        )
+        return Response(
+            output_serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=headers
+        )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        output_serializer = RecipeSerializer(instance, context={'request': request})
+        return Response(output_serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+
     def _add_to_related(self, model, request, pk):
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
-        try:
-            obj, created = (
-                model.objects.get_or_create(user=user, recipe=recipe)
-            )
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        obj, created = model.objects.get_or_create(user=user, recipe=recipe)
         if not created:
             return Response(
                 {'error': 'Уже добавлено'},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST
             )
         return Response(
             RecipeShortSerializer(recipe, context={'request': request}).data,
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED
         )
 
     def _remove_from_related(self, model, request, pk):
+        # Исправление: сначала проверяем существование рецепта
+        recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
-        try:
-            deleted, _ = (
-                model.objects
-                .filter(user=user, recipe__id=pk)
-                .delete()
-            )
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        deleted, _ = model.objects.filter(
+            user=user,
+            recipe=recipe
+        ).delete()
         if deleted == 0:
             return Response(
                 {'error': 'Не найдено'},
-                status=status.HTTP_404_NOT_FOUND,
+                status=status.HTTP_400_BAD_REQUEST
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -175,7 +154,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return self._add_to_related(ShoppingCart, request, pk)
         return self._remove_from_related(ShoppingCart, request, pk)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], url_path='get-link')
     def get_link(self, request, pk=None):
         recipe = get_object_or_404(Recipe, id=pk)
         base_url = request.build_absolute_uri('/')[:-1]
@@ -209,36 +188,32 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return FileResponse(
             content,
             content_type='text/plain',
-            filename='shopping_list.txt',
+            filename='shopping_list.txt'
         )
 
 
-class UserViewSet(
-    mixins.CreateModelMixin,
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    viewsets.GenericViewSet,
-):
-    """Вьюсет для пользователей (регистрация, профиль, подписки)."""
+class UserViewSet(DjoserUserViewSet):
+    """
+    Кастомизированный вьюсет для модели User.
 
-    queryset = User.objects.all()
-    serializer_class = UserWithRecipesSerializer
-    pagination_class = Pagination
+    Добавляет поддержку подписок, аватара и переопределяет метод me.
+    """
+
+    serializer_class = UserSerializer
 
     def get_permissions(self):
-        if self.action == 'create':
+        if self.action in ('list', 'retrieve'):
             return [AllowAny()]
-        if self.action == 'me':
-            return [IsAuthenticated()]
-        return super().get_permissions()
+        if self.action == 'create':
+            return super().get_permissions()
+        return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.action == 'subscriptions':
             return UserWithRecipesSerializer
-        if self.action == 'create':
-            return UserCreateSerializer
-        # Для list, retrieve, me используем базовый сериализатор
-        return UserSerializer
+        if self.action == 'me':
+            return UserSerializer
+        return super().get_serializer_class()
 
     @action(detail=False, methods=['get'])
     def me(self, request):
@@ -246,60 +221,90 @@ class UserViewSet(
         return Response(serializer.data)
 
     @action(detail=True, methods=['post', 'delete'])
-    def subscribe(self, request, pk=None):
-        author = get_object_or_404(User, id=pk)
+    def subscribe(self, request, id=None):
+        author = get_object_or_404(User, id=id)
         user = request.user
 
         if request.method == 'POST':
             if user == author:
                 return Response(
                     {'error': 'Нельзя подписаться на себя'},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    status=status.HTTP_400_BAD_REQUEST
                 )
             sub, created = Subscription.objects.get_or_create(
                 user=user,
-                author=author,
+                author=author
             )
             if not created:
                 return Response(
                     {'error': 'Уже подписаны'},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    status=status.HTTP_400_BAD_REQUEST
                 )
             serializer = UserWithRecipesSerializer(
                 author,
-                context={'request': request},
+                context={'request': request}
             )
-            return Response(
-                serializer.data,
-                status=status.HTTP_201_CREATED,
-            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         deleted, _ = Subscription.objects.filter(
             user=user,
-            author=author,
+            author=author
         ).delete()
         if deleted == 0:
             return Response(
                 {'error': 'Вы не подписаны'},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'])
     def subscriptions(self, request):
         user = request.user
-        authors = User.objects.filter(following__user=user).distinct()
+        authors = User.objects.filter(following__user=user)
         page = self.paginate_queryset(authors)
         if page is not None:
             serializer = UserWithRecipesSerializer(
                 page,
                 many=True,
-                context={'request': request},
+                context={'request': request}
             )
             return self.get_paginated_response(serializer.data)
         serializer = UserWithRecipesSerializer(
             authors,
             many=True,
-            context={'request': request},
+            context={'request': request}
         )
         return Response(serializer.data)
+
+    @action(detail=False, methods=['put', 'delete'],
+            url_path='me/avatar')
+    def avatar(self, request):
+        user = request.user
+        if request.method == 'PUT':
+            avatar_data = request.data.get('avatar')
+            if not avatar_data:
+                return Response(
+                    {'avatar': 'Это поле обязательно.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                format, imgstr = avatar_data.split(';base64,')
+                ext = format.split('/')[-1]
+                data = ContentFile(
+                    base64.b64decode(imgstr),
+                    name=f'avatar_{user.id}.{ext}'
+                )
+                user.avatar.save(data.name, data, save=True)
+            except Exception:
+                return Response(
+                    {'avatar': 'Неверный формат изображения'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            return Response(
+                {'avatar': request.build_absolute_uri(user.avatar.url)},
+                status=status.HTTP_200_OK
+            )
+        else:  # DELETE
+            if user.avatar:
+                user.avatar.delete(save=True)
+            return Response(status=status.HTTP_204_NO_CONTENT)
