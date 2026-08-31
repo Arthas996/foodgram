@@ -90,6 +90,7 @@ docker compose -f docker-compose.production.yml up -d
 Документация API
 Спецификация API доступна по адресу:
 http://127.0.0.1:8000/api/docs/
+https://foodgram96.work.gd/api/docs/
 
 
 Коллекция Postman для тестирования лежит в папке postman_collection/.

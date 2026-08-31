@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'users',
     'recipes',
     'api',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -118,6 +119,7 @@ REST_FRAMEWORK = {
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'
 }
 
 DJOSER = {
